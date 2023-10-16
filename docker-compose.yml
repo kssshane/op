@@ -1,0 +1,92 @@
+version: "3"
+
+services:
+  frontend:
+    image: op/frontend:latest
+    container_name: frontend
+    build: ./frontend
+    volumes:
+      -  op-volume:/frontend/
+      - ./frontend:/frontend/
+    ports:
+      - 3000:3000
+    working_dir: /frontend/
+    networks:
+      - opnetwork
+    stdin_open: true
+    restart: always
+  backend:
+    image: op/backend:latest
+    container_name: backend
+    build: ./backend
+    volumes:
+      - op-backend:/backend/
+      - ./backend:/backend
+    ports:
+      - 8181:8181
+    networks:
+      - mynetwork
+    environment:
+      DB_HOST_NAME: storage
+      SPRING_PROFILES_ACTIVE: container
+    depends_on:
+      - storage
+    restart: always
+
+  storage:
+    image: chantifa/src-storage:latest
+    container_name: storage
+    build: ./storage
+    volumes:
+      - postgres-volume:/var/lib/postgresql/data
+    networks:
+      - mynetwork
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: secret
+      POSTGRES_DB: answerium
+    ports:
+      - 5432:5432
+    restart: always
+  grafana:
+    image: grafana/grafana:7.1.5
+    container_name: grafana
+  # Required valid permission for /var/lib/grafana to create files and folders
+  # Since I run from the root so both uid and gid are 0:0
+  # but you can use the command i.e. (id) without brackets to find your user correct numbers
+    privileged: true #Required for running docker inside container
+    user: root #Required for running various scripts
+    ports:
+      - 3030:3030
+    networks:
+      - mynetwork
+    volumes:
+      - metrics-data:/etc/grafana/provisioning/datasources/
+      - ./datasources.yml:/etc/grafana/provisioning/datasources/datasources.yml
+  prom:
+    image: prom/prometheus:v2.20.1
+    container_name: prometheus
+    extra_hosts: ["host.docker.internal:172.28.0.1"] # from Gateway bridge and added /etc/hosts
+    ports:
+      - 9090:9090
+    networks:
+      - mynetwork
+    volumes:
+      - metrics-data:/etc/prometheus/
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+
+      # fixed the path here as originally you wrote without /etc
+      # while in above line you are mentioning /etc/ so was causing errors
+  node-exporter:
+    image: prom/node-exporter:latest
+    container_name: node-exporter
+    ports:
+      - 9100:9100
+    networks:
+      - mynetwork
+networks:
+  mynetwork:
+volumes:
+  answerium-volume:
+  postgres-volume:
+  metrics-data:
