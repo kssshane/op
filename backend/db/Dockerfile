@@ -1,4 +1,4 @@
-FROM postgres:alpine
+FROM postgres:16-alpine
 
 # Custom initialization scripts
 ADD  ddl.sql /docker-entrypoint-initdb.d
